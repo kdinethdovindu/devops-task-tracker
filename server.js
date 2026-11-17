@@ -1,4 +1,3 @@
-
 const express = require("express");
 const { randomUUID } = require("node:crypto");
 
@@ -31,7 +30,7 @@ app.post("/api/tasks", (req, res) => {
   const task = {
     id: randomUUID(),
     title,
-    done: false
+    done: false,
   };
 
   tasks.push(task);
@@ -40,7 +39,7 @@ app.post("/api/tasks", (req, res) => {
 
 // Toggle task status
 app.patch("/api/tasks/:id", (req, res) => {
-  const task = tasks.find(t => t.id === req.params.id);
+  const task = tasks.find((t) => t.id === req.params.id);
 
   if (!task) {
     return res.status(404).json({ error: "Task not found" });
@@ -50,12 +49,14 @@ app.patch("/api/tasks/:id", (req, res) => {
   res.json(task);
 });
 
-const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-});
+if (require.main === module) {
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 
-// Graceful shutdown
-process.on("SIGTERM", () => {
-  console.log("Shutting down...");
-  server.close(() => process.exit(0));
-});
+  process.on("SIGTERM", () => {
+    server.close(() => process.exit(0));
+  });
+}
+
+module.exports = app;

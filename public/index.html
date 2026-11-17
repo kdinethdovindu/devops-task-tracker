@@ -1,67 +1,63 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <title>DevOps Task Tracker</title>
-</head>
-<body>
-  <h1>DevOps Task Tracker</h1>
+  <head>
+    <title>DevOps Task Tracker</title>
+  </head>
+  <body>
+    <h1>DevOps Task Tracker</h1>
 
-  <form id="taskForm">
-    <input id="title" placeholder="Enter task" required />
-    <button type="submit">Add Task</button>
-  </form>
+    <form id="taskForm">
+      <input id="title" placeholder="Enter task" required />
+      <button type="submit">Add Task</button>
+    </form>
 
-  <ul id="taskList"></ul>
+    <ul id="taskList"></ul>
 
-  <script>
-    const form = document.getElementById("taskForm");
-    const list = document.getElementById("taskList");
+    <script>
+      const form = document.getElementById("taskForm");
+      const list = document.getElementById("taskList");
 
-    async function loadTasks() {
-      const response = await fetch("/api/tasks");
-      const tasks = await response.json();
+      async function loadTasks() {
+        const response = await fetch("/api/tasks");
+        const tasks = await response.json();
 
-      list.replaceChildren();
+        list.replaceChildren();
 
-      tasks.forEach(task => {
-        const item = document.createElement("li");
-        const button = document.createElement("button");
+        tasks.forEach((task) => {
+          const item = document.createElement("li");
+          const button = document.createElement("button");
 
-        button.textContent = task.done ? "Undo" : "Done";
+          button.textContent = task.done ? "Undo" : "Done";
 
-        item.append(
-          document.createTextNode(task.title + " "),
-          button
-        );
+          item.append(document.createTextNode(task.title + " "), button);
 
-        button.onclick = async () => {
-          await fetch(`/api/tasks/${task.id}`, {
-            method: "PATCH"
-          });
-          loadTasks();
-        };
+          button.onclick = async () => {
+            await fetch(`/api/tasks/${task.id}`, {
+              method: "PATCH",
+            });
+            loadTasks();
+          };
 
-        list.appendChild(item);
-      });
-    }
+          list.appendChild(item);
+        });
+      }
 
-    form.onsubmit = async event => {
-      event.preventDefault();
+      form.onsubmit = async (event) => {
+        event.preventDefault();
 
-      await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: document.getElementById("title").value
-        })
-      });
+        await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: document.getElementById("title").value,
+          }),
+        });
 
-      form.reset();
+        form.reset();
+        loadTasks();
+      };
+
       loadTasks();
-    };
-
-    loadTasks();
-  </script>
-</body>
+    </script>
+  </body>
 </html>
