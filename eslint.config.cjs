@@ -3,7 +3,7 @@ const globals = require("globals");
 
 module.exports = [
   {
-    files: ["server.js", "tests/**/*.js"],
+    files: ["server.js", "db.js", "tests/**/*.js"],
     languageOptions: {
       globals: globals.node,
     },
