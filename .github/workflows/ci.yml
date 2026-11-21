@@ -14,6 +14,21 @@ jobs:
     name: CI Checks
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: devops
+          POSTGRES_PASSWORD: test123
+          POSTGRES_DB: task_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devops -d task_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Get source code
         uses: actions/checkout@v7
@@ -35,6 +50,13 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Test database migrations
+        env:
+          MIGRATION_DATABASE_URL: postgresql://devops:test123@localhost:5432/task_test
+        run: |
+          npm run migrate
+          npm run migrate  
 
       - name: Build Docker image
         run: docker build -t devops-task-tracker:ci .
