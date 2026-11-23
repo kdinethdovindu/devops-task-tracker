@@ -179,3 +179,27 @@ test("Priority feature works when enabled", async () => {
     });
   }
 });
+
+test("Static CSS is cacheable", async () => {
+  const response = await fetch(`${baseUrl}/styles.v1.css`);
+
+  assert.equal(response.status, 200);
+  assert.equal(
+    response.headers.get("cache-control"),
+    "public, max-age=31536000, immutable",
+  );
+});
+
+test("API responses cannot be cached", async () => {
+  const response = await fetch(`${baseUrl}/api/tasks`);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
+test("HTML requires cache revalidation", async () => {
+  const response = await fetch(`${baseUrl}/`);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-cache");
+});

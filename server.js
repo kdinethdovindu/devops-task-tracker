@@ -12,7 +12,32 @@ function createApp(db, options = {}) {
     options.priorityEnabled ?? process.env.ENABLE_TASK_PRIORITY === "true";
 
   app.use(express.json());
-  app.use(express.static("public"));
+
+  // Never cache dynamic API responses
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/api/") || req.path === "/health") {
+      res.setHeader("Cache-Control", "no-store");
+    }
+
+    next();
+  });
+
+  // Configure caching for static files
+  app.use(
+    express.static("public", {
+      setHeaders(res, filePath) {
+        // Versioned CSS: cache for one year
+        if (filePath.endsWith("styles.v1.css")) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+
+        // HTML: check for new content
+        if (filePath.endsWith("index.html")) {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      },
+    }),
+  );
 
   // Tell frontend whether priority is enabled
   app.get("/api/config", (req, res) => {
