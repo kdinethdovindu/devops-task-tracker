@@ -20,6 +20,7 @@ const fakeDb = {
         id: params[0],
         title: params[1],
         done: false,
+        priority: params[2] ?? "MEDIUM",
       };
 
       savedTasks.push(task);
@@ -43,7 +44,7 @@ const fakeDb = {
   },
 };
 
-const app = createApp(fakeDb);
+const app = createApp(fakeDb, { priorityEnabled: false });
 
 let server;
 let baseUrl;
@@ -112,4 +113,69 @@ test("Rejects an empty task title", async () => {
   });
 
   assert.equal(response.status, 400);
+});
+
+test("Priority feature is disabled", async () => {
+  const response = await fetch(`${baseUrl}/api/config`);
+  const config = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(config.priorityEnabled, false);
+});
+
+test("Priority feature works when enabled", async () => {
+  const enabledApp = createApp(fakeDb, {
+    priorityEnabled: true,
+  });
+
+  const enabledServer = enabledApp.listen(0, "127.0.0.1");
+
+  await new Promise((resolve) => {
+    enabledServer.once("listening", resolve);
+  });
+
+  const url = `http://127.0.0.1:${enabledServer.address().port}`;
+
+  try {
+    // Check feature flag
+    const configResponse = await fetch(`${url}/api/config`);
+    const config = await configResponse.json();
+
+    assert.equal(config.priorityEnabled, true);
+
+    // Create HIGH-priority task
+    const response = await fetch(`${url}/api/tasks`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "Test priority",
+        priority: "HIGH",
+      }),
+    });
+
+    const task = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(task.priority, "HIGH");
+
+    // Reject invalid priority
+    const invalidResponse = await fetch(`${url}/api/tasks`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "Invalid task",
+        priority: "URGENT",
+      }),
+    });
+
+    assert.equal(invalidResponse.status, 400);
+  } finally {
+    await new Promise((resolve) => {
+      enabledServer.close(resolve);
+    });
+  }
 });
