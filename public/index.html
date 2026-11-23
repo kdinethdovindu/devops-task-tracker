@@ -1,6 +1,7 @@
 <!doctype html>
 <html>
   <head>
+    <meta charset="UTF-8" />
     <title>DevOps Task Tracker</title>
   </head>
   <body>
@@ -8,6 +9,16 @@
 
     <form id="taskForm">
       <input id="title" placeholder="Enter task" required />
+
+      <label id="priorityField" hidden>
+        Priority:
+        <select id="priority">
+          <option value="LOW">Low</option>
+          <option value="MEDIUM" selected>Medium</option>
+          <option value="HIGH">High</option>
+        </select>
+      </label>
+
       <button type="submit">Add Task</button>
     </form>
 
@@ -16,9 +27,32 @@
     <script>
       const form = document.getElementById("taskForm");
       const list = document.getElementById("taskList");
+      const priorityField = document.getElementById("priorityField");
 
+      let priorityEnabled = false;
+
+      // Read feature flag from backend
+      async function loadConfig() {
+        const response = await fetch("/api/config");
+
+        if (!response.ok) {
+          throw new Error("Failed to load configuration");
+        }
+
+        const config = await response.json();
+
+        priorityEnabled = config.priorityEnabled === true;
+        priorityField.hidden = !priorityEnabled;
+      }
+
+      // Show tasks
       async function loadTasks() {
         const response = await fetch("/api/tasks");
+
+        if (!response.ok) {
+          throw new Error("Failed to load tasks");
+        }
+
         const tasks = await response.json();
 
         list.replaceChildren();
@@ -29,35 +63,60 @@
 
           button.textContent = task.done ? "Undo" : "Done";
 
-          item.append(document.createTextNode(task.title + " "), button);
+          const priorityText = priorityEnabled ? ` [${task.priority}] ` : " ";
+
+          item.append(
+            document.createTextNode(task.title + priorityText),
+            button,
+          );
 
           button.onclick = async () => {
             await fetch(`/api/tasks/${task.id}`, {
               method: "PATCH",
             });
-            loadTasks();
+
+            await loadTasks();
           };
 
           list.appendChild(item);
         });
       }
 
+      // Create task
       form.onsubmit = async (event) => {
         event.preventDefault();
 
-        await fetch("/api/tasks", {
+        const task = {
+          title: document.getElementById("title").value,
+        };
+
+        if (priorityEnabled) {
+          task.priority = document.getElementById("priority").value;
+        }
+
+        const response = await fetch("/api/tasks", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: document.getElementById("title").value,
-          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(task),
         });
 
+        if (!response.ok) {
+          alert("Could not create task");
+          return;
+        }
+
         form.reset();
-        loadTasks();
+        await loadTasks();
       };
 
-      loadTasks();
+      async function initialize() {
+        await loadConfig();
+        await loadTasks();
+      }
+
+      initialize().catch(console.error);
     </script>
   </body>
 </html>

@@ -4,39 +4,47 @@ const createPool = require("./db");
 
 const PORT = process.env.PORT || 3000;
 
-// Create our Express app using a database connection
-function createApp(db) {
+function createApp(db, options = {}) {
   const app = express();
+
+  // Feature flag: OFF by default
+  const priorityEnabled =
+    options.priorityEnabled ?? process.env.ENABLE_TASK_PRIORITY === "true";
 
   app.use(express.json());
   app.use(express.static("public"));
 
-  // 1. Health check
+  // Tell frontend whether priority is enabled
+  app.get("/api/config", (req, res) => {
+    res.json({ priorityEnabled });
+  });
+
+  // Health check
   app.get("/health", async (req, res) => {
     try {
       await db.query("SELECT 1");
       res.json({ status: "OK" });
     } catch (error) {
-      console.error("Health check failed:", error.message);
+      console.error(error.message);
       res.status(503).json({ status: "ERROR" });
     }
   });
 
-  // 2. Get all tasks
+  // Get tasks
   app.get("/api/tasks", async (req, res) => {
     try {
       const result = await db.query(
-        "SELECT id, title, done FROM tasks ORDER BY created_at DESC, id DESC",
+        "SELECT id, title, done, priority FROM tasks ORDER BY created_at DESC, id DESC",
       );
 
       res.json(result.rows);
     } catch (error) {
-      console.error("Get tasks failed:", error.message);
+      console.error(error.message);
       res.status(500).json({ error: "Failed to load tasks" });
     }
   });
 
-  // 3. Create a new task
+  // Create task
   app.post("/api/tasks", async (req, res) => {
     const title = req.body?.title;
 
@@ -46,32 +54,50 @@ function createApp(db) {
       });
     }
 
+    // Only accept selected priority when enabled
+    const priority = priorityEnabled
+      ? (req.body?.priority ?? "MEDIUM")
+      : "MEDIUM";
+
+    const allowed = ["LOW", "MEDIUM", "HIGH"];
+
+    if (!allowed.includes(priority)) {
+      return res.status(400).json({
+        error: "Invalid priority",
+      });
+    }
+
     try {
       const result = await db.query(
-        "INSERT INTO tasks (id, title) VALUES ($1, $2) RETURNING id, title, done",
-        [randomUUID(), title.trim()],
+        `INSERT INTO tasks (id, title, priority)
+         VALUES ($1, $2, $3)
+         RETURNING id, title, done, priority`,
+        [randomUUID(), title.trim(), priority],
       );
 
       res.status(201).json(result.rows[0]);
     } catch (error) {
-      console.error("Create task failed:", error.message);
+      console.error(error.message);
       res.status(500).json({ error: "Failed to create task" });
     }
   });
 
-  // 4. Toggle task completion
+  // Toggle completion
   app.patch("/api/tasks/:id", async (req, res) => {
     const id = req.params.id;
-
     const uuidPattern = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 
     if (!uuidPattern.test(id)) {
-      return res.status(400).json({ error: "Invalid task ID" });
+      return res.status(400).json({
+        error: "Invalid task ID",
+      });
     }
 
     try {
       const result = await db.query(
-        "UPDATE tasks SET done = NOT done WHERE id = $1 RETURNING id, title, done",
+        `UPDATE tasks SET done = NOT done
+         WHERE id = $1
+         RETURNING id, title, done, priority`,
         [id],
       );
 
@@ -83,7 +109,7 @@ function createApp(db) {
 
       res.json(result.rows[0]);
     } catch (error) {
-      console.error("Update task failed:", error.message);
+      console.error(error.message);
       res.status(500).json({ error: "Failed to update task" });
     }
   });
@@ -91,7 +117,6 @@ function createApp(db) {
   return app;
 }
 
-// Only start a real server when running npm start
 if (require.main === module) {
   require("dotenv").config();
 
@@ -109,5 +134,4 @@ if (require.main === module) {
   });
 }
 
-// Allow automated tests to create the app
 module.exports = createApp;
